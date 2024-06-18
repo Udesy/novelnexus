@@ -1,11 +1,11 @@
 import express, { response } from "express";
 import pg from "pg";
 import bodyParser from "body-parser";
-import env from "dotenv";
+import dotenv from "dotenv";
 
 const app = express();
 const port = 3000;
-env.config();
+dotenv.config();
 
 const db = new pg.Client({
     user: process.env.DB_USER,
