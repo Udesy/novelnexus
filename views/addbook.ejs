@@ -1,0 +1,53 @@
+<%- include("partials/header.ejs") %>
+
+<div id="books_review">
+    <form action="/addbook" method="post">
+        <div id="books_reviews">
+            <input type="hidden" name="cover_id" value="<%= locals.cover %>">
+            <input type="hidden" name="title" value="<%= locals.title %>">
+            <input type="hidden" name="bookId" value="<%= locals.book_id %>">
+            <input type="hidden" name="author" value="<%= locals.author %>">
+            <div id="book_image">
+                <img src="https://covers.openlibrary.org/b/id/<%=locals.cover%>-L.jpg" 
+                srcset="https://covers.openlibrary.org/b/id/<%=locals.cover%>-L.jpg 2x" alt="book cover">
+            </div>
+
+            <div id="book_info">
+                <h1 id="book_title"><%= locals.title %></h1>
+                <h2 id="book_author">By <%= locals.author %></h2>
+                <div id="review_text">
+                    <% if(locals.review){ %>
+                        <h3>Edit Review:</h3>
+                        <textarea name="review_text" id="review_text" cols="30" rows="10" required><%= locals.review %></textarea>
+                    <% }else{ %>
+                        <h3>Write Review:</h3>
+                        <textarea name="write_review" id="write_review" cols="30" rows="10" required></textarea>
+                    <% } %>
+                </div>
+                <div class="rate">
+                    <input type="radio" id="star5" name="rate" value="5" />
+                    <label for="star5" title="text">5 stars</label>
+                    <input type="radio" id="star4" name="rate" value="4" />
+                    <label for="star4" title="text">4 stars</label>
+                    <input type="radio" id="star3" name="rate" value="3" />
+                    <label for="star3" title="text">3 stars</label>
+                    <input type="radio" id="star2" name="rate" value="2" />
+                    <label for="star2" title="text">2 stars</label>
+                    <input type="radio" id="star1" name="rate" value="1"  required/>
+                    <label for="star1" title="text">1 star</label>
+                </div>
+            <% if(locals.review){ %>
+                <div class="submit_button">
+                    <button formmethod="post" type="submit" formaction="/updateReview">Edit Review</button>
+                </div>
+            <%}else{ %>
+                <div class="submit_button">
+                    <button formmethod="post" type="submit" formaction="/addbook">Add Book</button>
+                </div>
+            <% } %>  
+            </div>
+        </div>
+    </form>
+</div>
+
+<%- include("partials/footer.ejs") %>

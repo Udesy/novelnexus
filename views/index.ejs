@@ -1,0 +1,48 @@
+<%- include('partials/header.ejs') %>
+    
+    <div class="sort">
+        <form action="/sort" method="post">
+            <label for="sort">Sort By: </label>
+                <select id="sort-option" name="sort" onchange="this.form.submit()">
+                    <option value="">Sort By:</option>
+                    <option value="Rating">Rating</option>
+                    <option value="Recent">Recent</option>
+                </select>
+        </form>
+    </div>
+
+<div class="books">
+    <% locals.data.forEach(book => { %>
+        <div class="book">
+            <div class="book_cover">
+                <img src="https://covers.openlibrary.org/b/id/<%=book.cover_id%>-L.jpg" 
+                srcset="https://covers.openlibrary.org/b/id/<%=book.cover_id%>-L.jpg 2x" alt="book cover">
+            </div>
+            <div class="book_info">
+                <h1><%= book.book_name %></h1>
+                <h2>By <%= book.book_author %></h2>
+                    <div class="rating">
+                        <% for (let i=0; i < book.rating; i ++){ %>
+                            <i class="star"></i>
+                        <% } %>
+                    </div>
+                <h3><%= book.review_text %></h3>
+                 <div class="edit_button">
+                    <div id="edit button">
+                        <a href="/book?title=<%= book.book_name %>&author=<%= book.book_author %>&coverId=<%=book.cover_id%>">
+                        <button type="button">Edit</button>    
+                        </a>
+                    </div>
+                    <div id="delete button">
+                        <form action="/delete" method="post">
+                            <button type="submit" value="<%=book.book_id%>" name="bookId">Delete</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <% }); %>
+</div>
+
+
+<%- include('partials/footer.ejs') %>
