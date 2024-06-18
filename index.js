@@ -4,7 +4,7 @@ import bodyParser from "body-parser";
 import dotenv from "dotenv";
 
 const app = express();
-const port = process.env.DB_PASSWORD || 3000;
+const port = process.env.DB_PORT || 3000;
 dotenv.config();
 
 const db = new pg.Client({
