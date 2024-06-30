@@ -1,11 +1,28 @@
 import express, { response } from "express";
 import pg from "pg";
 import bodyParser from "body-parser";
+import bcrypt from "bcrypt";
+import passport from "passport";
+import { Strategy } from "passport-local";
+import GoogleStrategy from "passport-google-oauth2";
+import session from "express-session";
 import dotenv from "dotenv";
 
 const app = express();
 const port =  process.env.DB_PORT || 3000;
+const saltRounds = 10;
 dotenv.config();
+
+app.use(
+    session({
+        secret: "TOPSECRETWORD",
+        resave: false,
+        saveUninitialized: true,
+        cookie: {
+            maxAge: 1000 * 60 * 5
+        }
+    })
+);
 
 const db = new pg.Client({
     user: process.env.DB_USER,
@@ -16,32 +33,69 @@ const db = new pg.Client({
     ssl: true
 });
 
-// const connectionString = process.env.DATABASE_URL;
-// const db = new pg.Client({
-//     connectionString: connectionString,
-// });
-
 db.connect();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
+app.use(passport.initialize());
+app.use(passport.session());
 
-app.get("/", async(req, res) => {
-    try{
-        const response = await db.query(
-            `SELECT * 
-             FROM books
-             JOIN book_reviews ON books.book_id = book_reviews.book_id`
-        )
 
-        const data = response.rows;
-        res.render("index.ejs",{
-            data : data
-        })
-    }catch(error){
-        console.log("Error: ", error);
+app.get("/", (req, res) => {
+    res.render("login.ejs")
+});
+
+app.get("/register", (req, res) => {
+    res.render("register.ejs")
+});
+
+app.get(
+    "/auth/google",
+    passport.authenticate("google", {
+        scope: ["profile", "email"],
+    })
+);
+
+app.get(
+    "/auth/google/books",
+    passport.authenticate("google", {
+        successRedirect: "/books",
+        failureRedirect: "/"
+    })
+);
+
+app.get("/books", async(req, res) => {
+    console.log(req.user);
+    if(req.isAuthenticated()){
+        const user = req.user
+        try{
+            const response = await db.query(
+                `SELECT * 
+                 FROM books
+                 JOIN book_reviews ON books.book_id = book_reviews.book_id
+                 WHERE books.user_id = $1`,
+                 [user.id]
+            )
+    
+            const data = response.rows;
+            res.render("index.ejs",{
+                data : data,
+                user: user.email,
+            })
+        }catch(error){
+            console.log("Error: ", error);
+        }
+    }else{
+        res.redirect("/")
     }
 });
+
+app.post("/login", 
+    passport.authenticate("local", {
+        successRedirect: "/books",
+        failureRedirect: "/"
+    })
+);
 
 app.get("/book", async (req, res) => {
     const bookTitle = req.query.title;
@@ -71,6 +125,45 @@ app.get("/book", async (req, res) => {
     }
 });
 
+app.post("/register", async (req, res) => {
+     const email = req.body.username;
+     const password = req.body.password;
+
+     try{
+        const checkResult = await db.query(`
+            SELECT * FROM users WHERE email = $1`,
+        [email]);
+
+        if(checkResult.rows.length > 0){
+            res.send("Email already exist. Try logging in.")
+        }else{
+            //hashing the password and saving it in the database.
+            bcrypt.hash(password, saltRounds, async (err, hash) => {
+                if(err) {
+                    console.error("Error hashing password:", err);
+                } else {
+                    console.log("Hashed Password:", hash);
+                    const response = await db.query(`
+                        INSERT INTO users(email, password)
+                        VALUES($1, $2) RETURNING *`,
+                    [email, hash]
+                );
+                const user = response.rows[0]
+                console.log(user);
+                req.login(user, (err) => {
+                    console.log("success");
+                    res.redirect("/books")
+                })
+                }
+            })
+        }
+     }catch(err){
+        console.log(err);
+     }
+
+});
+
+
 app.post("/updateReview", async(req, res) => {
     const book_id = req.body.bookId;
     const review = req.body.review_text;
@@ -90,7 +183,7 @@ app.post("/updateReview", async(req, res) => {
     }catch(error){
         console.log("Error :", error);
     }
-    res.redirect("/")
+    res.redirect("/books")
 
 });
 
@@ -127,6 +220,8 @@ app.post("/sort", async (req, res) => {
 });
 
 app.post("/addbook" , async(req, res) => {
+    const user = req.user
+    const userId = user.id
     const title = req.body.title;
     const author = req.body.author;
     const review = req.body.write_review;
@@ -136,9 +231,9 @@ app.post("/addbook" , async(req, res) => {
 
     try{
         const newBook = await db.query(`
-            INSERT INTO books(book_author, book_name, cover_id)
-            VALUES($1, $2, $3)
-            RETURNING book_id`,[author, title, coverId]
+            INSERT INTO books(book_author, book_name, cover_id, user_id)
+            VALUES($1, $2, $3, $4)
+            RETURNING book_id`,[author, title, coverId, userId]
         );
         
         const newReview = await db.query(`
@@ -152,7 +247,7 @@ app.post("/addbook" , async(req, res) => {
         console.log("An Error Occured: ", error);
     }
 
-    res.redirect("/")
+    res.redirect("/books")
 });
 
 app.post("/delete", async(req, res) => {
@@ -171,9 +266,78 @@ app.post("/delete", async(req, res) => {
     }catch(error){
         console.log("Error : ", error);
     }
-    res.redirect("/")
+    res.redirect("/books")
 });
+
+app.use("/logout", (req, res) => {
+    req.logout(function (err) {
+        if (err) {
+          return next(err);
+        }
+        res.redirect("/");
+      });
+})
+
+passport.use("local",
+    new Strategy(async function verify(username, password, cb) {
+        try{
+            const result = await db.query("SELECT * FROM users WHERE email = $1", [username]);
+            if(result.rows.length > 0){
+                const user = result.rows[0];
+                const storedHashedPassword = user.password;
+                bcrypt.compare(password, storedHashedPassword, (err, valid) => {
+                    if(err){
+                        //Error with password check
+                        console.error("Error comparing password:", err);
+                    }else{
+                        if(valid){
+                            //Passed password check
+                            return cb(null, user)
+                        }else{
+                            //Did not pass password check
+                            return cb(null, false)
+                        }
+                    }
+                })
+            }else{
+                return cb("User not found")
+            }
+        }catch(err){
+            console.log(err);
+        }
+    })
+);
+
+passport.use("google",
+    new GoogleStrategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: "http://localhost:3000/auth/google/books",
+        userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo", 
+    },
+async(accessToken, refreshToken, profile, cb) => {
+    console.log(profile);
+    try{
+        const response = await db.query("SELECT * FROM users WHERE email = $1", [profile.email]);
+        if(response.rows.length === 0){
+            const newUser = await db.query("INSERT INTO users(email, password) VALUES($1, $2)", [profile.email, "google"])
+            cb(null, newUser.rows[0])
+        }else{
+            cb(null, response.rows[0])
+        }
+    }catch(err){
+        cb(err)
+    }
+})
+);
+
+passport.serializeUser((user, cb) => {
+    cb(null, user);
+  });
+passport.deserializeUser((user, cb) => {
+    cb(null, user);
+  });
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`)
-})
+});

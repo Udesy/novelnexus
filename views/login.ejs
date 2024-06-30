@@ -1,0 +1,37 @@
+<%- include("partials/header.ejs") %>
+<div class="user_detail">
+  <form action="/login" method="post">
+    <div class="email_block">
+        <div class="title" >
+          <label for="email">Email</label>
+        </div>
+        <input type="email" name="username">
+    </div>
+    <div class="password_block">
+        <div class="title">
+          <label for="password">Password</label>
+        </div>
+        <input type="password" name="password">
+    </div>
+    <button type="submit" class="submit_button">Login</button>
+</form>
+</div>
+
+<div class="google_button">
+  <a class="google_link" href="/auth/google" role="button">
+    <div class="google-btn">
+      <div class="google-icon-wrapper">
+        <img class="google-icon" src="https://i.ibb.co/ydLySMx/google.png" />
+      </div>
+      <p class="btn-text">Sign in with Google</p>
+    </div>
+  </a>
+</div>
+<div class="register">
+  <a href="/register">
+    <button type="submit" class="register_button">Register</button>
+  </a>
+
+</div>
+
+<%- include("partials/footer.ejs") %>
